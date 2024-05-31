@@ -1,5 +1,6 @@
 package com.et.eachtogether.security;
 
+import com.et.eachtogether.user.User;
 import com.et.eachtogether.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -15,6 +16,9 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return null;
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("email이 올바르지 않습니다."));
+
+        return new UserDetailsImpl(user);
     }
 }
