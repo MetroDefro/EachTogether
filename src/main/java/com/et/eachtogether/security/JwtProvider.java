@@ -20,6 +20,9 @@ import java.util.Map;
 @Component
 public class JwtProvider {
 
+    public final String HEADER_ACCESS = "Access";
+    public final String HEADER_REFRESH = "Refresh";
+
     @Value("${jwt.secret}")
     private String SECRET_KEY;
 
@@ -29,9 +32,6 @@ public class JwtProvider {
     private Long EXPIRATION_REFRESH;
 
     private final String TOKEN_PREFIX = "Bearer ";
-
-    private final String HEADER_ACCESS = "Access";
-    private final String HEADER_REFRESH = "Refresh";
 
     private Key key;
 
