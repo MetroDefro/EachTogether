@@ -5,8 +5,6 @@ import com.et.eachtogether.user.dto.UserRequestDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -40,16 +38,8 @@ public class AuthService {
             throw new IllegalArgumentException("Invalid credentials");
         }
 
-        Authentication auth = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        requestDto.getEmail(),
-                        requestDto.getPassword()
-                )
-        );
-
         HttpHeaders headers = new HttpHeaders();
-        headers.add(jwtProvider.HEADER_ACCESS, jwtProvider.generateAccessToken(auth));
-        headers.add(jwtProvider.HEADER_REFRESH, jwtProvider.generateRefreshToken(auth));
+        headers.add(jwtProvider.HEADER, jwtProvider.generateToken(user));
 
         return headers;
     }
