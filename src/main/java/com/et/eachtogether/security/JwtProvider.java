@@ -1,12 +1,11 @@
 package com.et.eachtogether.security;
 
+import com.et.eachtogether.user.User;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -16,7 +15,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-@Slf4j
 @Component
 public class JwtProvider {
 
@@ -25,89 +23,68 @@ public class JwtProvider {
 
     @Value("${jwt.expiration.access}")
     private Long EXPIRATION_ACCESS;
-    @Value("${jwt.expiration.refresh}")
-    private Long EXPIRATION_REFRESH;
 
+    public final String HEADER = "Authorization";
     private final String TOKEN_PREFIX = "Bearer ";
-
-    private final String HEADER_ACCESS = "Access";
-    private final String HEADER_REFRESH = "Refresh";
+    public static final String CLAIM_NICKNAME = "nickname";
+    public static final String CLAIM_ROLE ="role";
 
     private Key key;
 
     @PostConstruct
-    public void init() { // 생성자가 호출된 뒤 이 메서드가 실행된다.
-        byte[] bytes = Base64.getDecoder().decode(SECRET_KEY); // 한 번 인코딩 되어있기 때문에 디코딩
+    public void init() {
+        byte[] bytes = Base64.getDecoder().decode(SECRET_KEY);
         key = Keys.hmacShaKeyFor(bytes);
     }
 
-    public String generateAccessToken(Authentication authentication) {
-        String username = authentication.getName();
-        return createToken(username, createClaims(username, HEADER_ACCESS), EXPIRATION_ACCESS);
+    public String generateToken(User user) {
+        Date curDate = new Date();
+        Date expireDate = new Date(curDate.getTime() + EXPIRATION_ACCESS);
+
+        return TOKEN_PREFIX + Jwts.builder()
+            .setSubject(user.getEmail())
+            .setClaims(createClaims(user))
+            .setExpiration(expireDate)
+            .setIssuedAt(curDate)
+            .signWith(key, SignatureAlgorithm.HS256)
+            .compact();
     }
 
-    public String generateRefreshToken(Authentication authentication) {
-        String username = authentication.getName();
-        return createToken(username, createClaims(username, HEADER_REFRESH), EXPIRATION_REFRESH);
+    private Map<String, Object> createClaims(User user) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put(CLAIM_NICKNAME, user.getNickname());
+        // to do: 이후 관리자/유저 유연하게 넣을 수 있도록 변경 예정
+        claims.put(CLAIM_ROLE, "ROLE_USER");
+        return claims;
     }
 
-    public String getAccessToken(HttpServletRequest request) {
-        return getToken(request.getHeader(HEADER_ACCESS));
-    }
-
-    public String getRefreshToken(HttpServletRequest request) {
-        return getToken(request.getHeader(HEADER_REFRESH));
+    public String getToken(HttpServletRequest request) {
+        String token = request.getHeader(HEADER);
+        if(StringUtils.hasText(token) && token.startsWith(TOKEN_PREFIX)) {
+            return token.replace(TOKEN_PREFIX, "");
+        }
+        return null;
     }
 
     public Claims getClaims(String token) {
         return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
     }
 
-    public boolean isValidToken(String token) {
+    // to do: 직접 String을 작성하지 않는 방법은?
+    public boolean isValidToken(String token, HttpServletRequest request) {
         try {
-            if(!StringUtils.hasText(token)) {
-                throw new JwtException("Token is empty");
-            }
             getClaims(token);
             return true;
-        } catch (MalformedJwtException e) {
-            log.error("Invalid JWT token: {}", e.getMessage());
+        } catch (SecurityException | MalformedJwtException | io.jsonwebtoken.security.SignatureException e) {
+            request.setAttribute("error", "Invalid JWT signature, 유효하지 않는 JWT 서명 입니다.");
         } catch (ExpiredJwtException e) {
-            log.error("JWT token is expired: {}", e.getMessage());
+            request.setAttribute("error", "Expired JWT token, 만료된 JWT token 입니다.");
         } catch (UnsupportedJwtException e) {
-            log.error("JWT token is unsupported: {}", e.getMessage());
+            request.setAttribute("error", "Unsupported JWT token, 지원되지 않는 JWT 토큰 입니다.");
         } catch (IllegalArgumentException e) {
-            log.error("JWT claims string is empty: {}", e.getMessage());
+            request.setAttribute("error", "JWT claims is empty, 잘못된 JWT 토큰 입니다.");
         }
 
         return false;
-    }
-
-    private Map<String, Object> createClaims(String email, String headerRefresh) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("category", headerRefresh);
-        claims.put("username", email);
-        claims.put("role", "ROLE_USER");
-        return claims;
-    }
-
-    private String createToken(final String email, Map<String, Object> claims, Long expiredMs) {
-        Date curDate = new Date();
-        Date expireDate = new Date(curDate.getTime() + expiredMs);
-
-        return TOKEN_PREFIX + Jwts.builder()
-                .setSubject(email)
-                .setClaims(claims)
-                .setExpiration(expireDate)
-                .setIssuedAt(curDate)
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
-    }
-
-    private String getToken(String token) {
-        if(StringUtils.hasText(token) && token.startsWith(TOKEN_PREFIX)) {
-            return token.replace(TOKEN_PREFIX, "");
-        }
-        return null;
     }
 }
