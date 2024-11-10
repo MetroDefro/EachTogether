@@ -4,6 +4,7 @@ import com.et.eachtogether.security.AuthenticationEntryPointImpl;
 import com.et.eachtogether.security.JwtAuthenticationFilter;
 import com.et.eachtogether.security.JwtProvider;
 import com.et.eachtogether.security.UserDetailsServiceImpl;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,12 +26,15 @@ public class SecurityConfig {
     private final JwtProvider jwtProvider;
 
     @Bean
+    public ObjectMapper objectMapper() { return new ObjectMapper(); }
+
+    @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
     @Bean
-    public AuthenticationEntryPointImpl authenticationEntryPoint() { return new AuthenticationEntryPointImpl(); }
+    public AuthenticationEntryPointImpl authenticationEntryPoint() { return new AuthenticationEntryPointImpl(objectMapper()); }
 
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() { return new JwtAuthenticationFilter(jwtProvider, userDetailsService); }
